@@ -1,0 +1,208 @@
+#compdef tmux-slay tslay
+
+setopt localoptions warncreateglobal typesetsilent
+
+_tmux-slay() {
+  local curcontext="$curcontext"
+  local ret=1
+  local state
+
+  _arguments -C \
+    '1: :->command'\
+    '*: :->argument' && ret=0
+
+  case "$state" in
+    command)
+      local -a commands
+      commands=(
+        check:"Check if command is running"
+        help:"Help"
+        kill:"Kill background command"
+        killall:"Clear all"
+        list:"List running commands"
+        run:"Run command in background"
+        select:"Focus on commmand"
+      )
+
+      _describe -t commands "tmux-slay command" commands && ret=0
+      ;;
+
+    argument)
+      case $words[2] in
+        help)
+          _message "Display help message" && ret=0
+          ;;
+        list)
+          local -a flags=(
+            -r:"Raw output"
+            -s:"Simple output"
+          )
+          if [[ $#words -eq 3 ]]
+          then
+            _alternative \
+              'opts:List flags:(($flags))' && \
+              ret=0
+          fi
+          ;;
+        check)
+          local -a flags=(
+            -q:"Quiet mode"
+          )
+          if [[ $#words -eq 3 ]]
+          then
+            _alternative \
+              'opts:Check flags:(($flags))' && \
+              ret=0
+          fi
+          ;;
+        kill|killall)
+          local -a commands
+          _tslay_get_slayed_commands commands
+
+          # Only suggest -n|--name if it the first word after the action
+          if [[ $#words -eq 3 ]]
+          then
+            commands+=(
+              --name:"Window name"
+              -n:"Window name"
+            )
+          fi
+          _alternative \
+            'slayed:Running commands:(($commands))' && \
+            ret=0
+          ;;
+        select)
+          local -a commands
+          _tslay_get_slayed_commands commands
+
+          # There's only 1 arg to select
+          if [[ $#words -eq 3 ]]
+          then
+            _alternative \
+              'slayed:Running commands:(($commands))' && \
+              ret=0
+          fi
+          ;;
+        run)
+          local -a optflags=(
+            -a:"Append. Open new window next to the current"
+            -append:"Append. Open new window next to the current"
+
+            --cd:"Change directory prior to executing command"
+
+            -e:"Set environment variable"
+            --env:"Set environment variable"
+
+            --loop:"Loop. Wrap command around infinite loop"
+            -l:"Loop. Wrap command around infinite loop"
+
+            --name:"Window name"
+            -n:"Window name"
+
+            --wait:"Loop sleep interval"
+            -w:"Loop sleep interval"
+
+            --timeout:"Max runtime of the command (seconds)"
+            -t:"Max runtime of the command (seconds)"
+          )
+          local -a nooptflags=(
+            --background:"Run command in background"
+            -b:"Run command in background"
+
+            --check:"Check on running command. Don't do anything if already running"
+            -c:"Check on running command. Don't do anything if already running"
+
+            --foreground:"Focus. Run command in foreground"
+            --select:"Focus. Run command in foreground"
+            -f:"Focus. Run command in foreground"
+
+            --kill:"Kill command"
+            -k:"Kill command"
+
+            --no-wrap:"Don't wrap command"
+            -N:"Don't wrap command"
+            -W:"Don't wrap command"
+
+            --quiet:"Quiet mode. Don't output the run info if already running"
+            -q:"Quiet mode. Don't output the run info if already running"
+
+            --sudo:"Wrap command with sudo"
+            -s:"Wrap command with sudo"
+
+            --unique:"Unique. Allow only one instance of command"
+            -u:"Unique. Allow only one instance of command"
+          )
+          local -a all_flags=($optflags $nooptflags)
+
+          local f
+          local w
+          local desc
+          local flag
+
+          for w in "$words[@]"
+          do
+            # --env is the only flag that can be set multiple times
+            [[ "$fl3" =~ "^-?-e(nv)?$" ]] && continue
+            for f in "$all_flags[@]"
+            do
+              if [[ "${f}" =~ "^${w}:" ]]
+              then
+                flag=("${(@s/:/)f}")
+                desc="$flag[2]"
+                all_flags=(${all_flags#*:$desc})
+                break
+              fi
+            done
+          done
+
+          case "$words[-2]" in
+            --cd)
+              _alternative \
+                'dirs:Directories:_path_files -/' && \
+                ret=0
+              ;;
+            -e|--env|--name|-n|--wait|-w|--timeout|-t)
+              _alternative \
+                'nocompl:None:()' && \
+              ret=0
+            ;;
+          *)
+            _alternative \
+              'opts:Run options:(($all_flags))' && \
+              ret=0
+            ;;
+          esac
+          ;;
+        *)
+          ret=1
+          ;;
+      esac
+  esac
+  return $ret
+}
+
+(( $+functions[_tslay_get_slayed_commands] )) ||
+_tslay_get_slayed_commands() {
+  local -a slayed_commands
+  local arrayname="$1"; shift
+  local cmd
+  local line
+  local win_id
+
+  tmux-slay list -s | while read -r line
+  do
+    read win_id cmd <<< "$line"
+    slayed_commands+=(${win_id}\:"${cmd}")
+  done
+
+  # "return" array
+  # https://unix.stackexchange.com/a/535135/101415
+  eval $arrayname'=("$slayed_commands[@]")'
+}
+
+(( $+functions[_tslay_debug] )) ||
+_tslay_debug() {
+  logger --id _tslay "$*"
+}
+
+_tmux-slay "$@"
