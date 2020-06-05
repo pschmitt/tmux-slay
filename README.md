@@ -57,6 +57,7 @@ tmux-slay select COMMAND
 
 By default `tmux-slay` will create a new TMUX session named `bg` (for
 backgroud) to run all the commands you instruct it to.
+
 To change that you can set the env var `TMUX_SLAY_SESSION`:
 
 ```bash
@@ -66,7 +67,9 @@ TMUX_SLAY_SESSION="MY_SESSION_NAME"
 ### Init window
 
 `tmux-slay` keeps its session alive by creating an empty init-window named
-`bg-init`. To change it you need to set `TMUX_SLAY_INIT_WINDOW_TITLE`:
+`bg-init`.
+
+To change it you need to set `TMUX_SLAY_INIT_WINDOW_TITLE`:
 
 ```bash
 TMUX_SLAY_INIT_WINDOW_TITLE="MY_INIT_WINDOW_TITLE"
