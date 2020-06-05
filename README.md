@@ -1,5 +1,9 @@
 # tmux-slay
 
+This scripts allows running commands in the background, in a TMUX session.
+
+It can be a poor man's init-sytem.
+
 ## Dependencies
 
 bash and tmux 🤷‍♂️
