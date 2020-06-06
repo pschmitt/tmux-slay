@@ -88,5 +88,6 @@ TMUX_SLAY_DEBUG=1
 ### Run an auto-reconnecting reverse SSH tunnel to the current machine
 
 ```bash
-tmux-slay run -l -c -u -n ssh-forward -- ssh -o ExitOnForwardFailure=yes -R 22222:localhost:22 user@myvps.example.com
+tmux-slay run -l -c -u -n ssh-forward -- \
+  ssh -o ExitOnForwardFailure=yes -R 22222:localhost:22 user@myvps.example.com
 ```
