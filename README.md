@@ -32,6 +32,9 @@ tmux-slay run COMMAND
 # List running commands
 tmux-slay list
 
+# Display and follow log
+tmux-slay logs -f COMMAND
+
 # Stop/kill it
 tmux-slay kill COMMAND
 

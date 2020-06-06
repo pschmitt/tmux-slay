@@ -20,6 +20,7 @@ _tmux-slay() {
         kill:"Kill background command"
         killall:"Clear all"
         list:"List running commands"
+        logs:"Display log of command"
         run:"Run command in background"
         select:"Focus on commmand"
       )
@@ -41,6 +42,17 @@ _tmux-slay() {
           then
             _alternative \
               'opts:List flags:(($flags))' && \
+              ret=0
+          fi
+          ;;
+        logs)
+          local -a flags=(
+            -f:"Follow log output"
+          )
+          if [[ $#words -eq 3 ]]
+          then
+            _alternative \
+              'opts:Logs flags:(($flags))' && \
               ret=0
           fi
           ;;

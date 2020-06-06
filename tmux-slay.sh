@@ -95,6 +95,50 @@ list_commands() {
   done
 }
 
+get_cmd_log() {
+  local win_id
+
+  win_id="$(guess_window_id_from_input "$@")"
+
+  if [[ -n "$win_id" ]]
+  then
+    local target="${TMUX_SLAY_SESSION}:${win_id}"
+    local hist_size
+    hist_size="$(tmux show-options -t bg -gqv history-limit)"
+    if [[ -z "$hist_size" ]]
+    then
+      # FIXME What's tmux's default?
+      hist_size=2000
+    fi
+
+    # Show logs
+    if [[ -z "$LOG_FOLLOW" ]]
+    then
+      tmux capture-pane -p -S "-${hist_size}" -t "$target"
+    else
+      local tmpfile
+      tmpfile=$(mktemp --tmpdir --suffix=.log 'tmux-slay.XXXXXX')
+
+      if [[ -n "$TMUX_SLAY_DEBUG" ]]
+      then
+        echo "Logging pane contents to $tmpfile" >&2
+      fi
+
+      # shellcheck disable=2064
+      trap "rm -f \"${tmpfile}\"; tmux pipe-pane -t \"${target}\"" \
+        SIGINT SIGTERM EXIT
+
+      # Run once without any command to clear previous pipes
+      tmux pipe-pane -t "$target"
+      tmux pipe-pane -t "$target" -O "cat >> \"$tmpfile\""
+
+      tail -f "$tmpfile"
+    fi
+  else
+    return 1
+  fi
+}
+
 guess_window_id_from_input() {
   local nofallback
 
@@ -704,6 +748,30 @@ then
       ACTION=list
       shift
       ;;
+    logs|lg)
+      ACTION=logs
+      shift
+      while [[ -n "$*" ]]
+      do
+        case "$1" in
+          -f|--follow)
+            LOG_FOLLOW=1
+            shift
+            ;;
+          -n|--name)
+            NAME="$2"
+            shift 2
+            ;;
+          --)
+            shift
+            break
+            ;;
+          *)
+            break
+            ;;
+        esac
+      done
+      ;;
     select|show)
       ACTION=select
       shift
@@ -741,6 +809,9 @@ then
         fi
         exit 1
       fi
+      ;;
+    logs)
+      get_cmd_log "$@"
       ;;
     run)
       if [[ -z "$*" ]]
