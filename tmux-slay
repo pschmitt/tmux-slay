@@ -95,10 +95,18 @@ list_commands() {
   done
 }
 
-get_cmd_log() {
+tmux_show_log() {
+  local follow
   local win_id
 
-  win_id="$(guess_window_id_from_input "$@")"
+  case "$1" in
+    -f|--follow)
+      follow=1
+      shift
+      ;;
+  esac
+
+  win_id="$1"
 
   if [[ -n "$win_id" ]]
   then
@@ -112,7 +120,7 @@ get_cmd_log() {
     fi
 
     # Show logs
-    if [[ -z "$LOG_FOLLOW" ]]
+    if [[ -z "$follow" ]]
     then
       tmux capture-pane -p -S "-${hist_size}" -t "$target"
     else
@@ -137,6 +145,76 @@ get_cmd_log() {
   else
     return 1
   fi
+}
+
+get_logs() {
+  # FIXME DRY (see tmux_kill_window)
+  local -a extra_args
+  local input_type=guess
+
+  case "$1" in
+    -f|--follow)
+      extra_args+=(-f)
+      shift
+      ;;
+  esac
+
+  case "$1" in
+    --latest|-l)
+      input_type=latest
+      shift
+      ;;
+    --cmd|-c)
+      input_type=cmd
+      shift
+      ;;
+    --guess|-g)
+      input_type=guess
+      shift
+      ;;
+    --pane-id|--pane|-p)
+      input_type=pane_id
+      shift
+      ;;
+    --window-id|--wid|--id)
+      input_type=window_id
+      shift
+      ;;
+    --window-name|--name|-n)
+      input_type=window_name
+      shift
+      ;;
+    *)
+      input_type=guess
+      ;;
+  esac
+
+  case "$input_type" in
+    latest)
+      mapfile -t win_ids < <(get_latest_window)
+      ;;
+    cmd)
+      mapfile -t win_ids < <(get_cmd_window_id "$@")
+      ;;
+    pane_id)
+      mapfile -t win_ids < <(tmux_get_window_id_from_pane_id "$@")
+      ;;
+    window_id)
+      win_ids=("$@")
+      ;;
+    window_name)
+      # Window name provided
+      mapfile -t win_ids < <(tmux_get_window_id_from_window_name "$@")
+      ;;
+    guess)
+      mapfile -t win_ids < <(guess_window_id_from_input -n "$@")
+      ;;
+  esac
+
+  # We don't allow multiple selections
+  local win_id="${win_ids[0]}"
+
+  tmux_show_log "${extra_args[@]}" "$win_id"
 }
 
 guess_window_id_from_input() {
@@ -811,7 +889,24 @@ then
       fi
       ;;
     logs)
-      get_cmd_log "$@"
+      extra_args=()
+
+      if [[ -n "$LOG_FOLLOW" ]]
+      then
+        extra_args+=(-f)
+      fi
+
+      if [[ -n "$NAME" ]]
+      then
+        get_logs "${extra_args[@]}" --name "$NAME"
+      else
+        if [[ -n "$*" ]]
+        then
+          get_logs "${extra_args[@]}" "$@"
+        else
+          get_logs "${extra_args[@]}" --latest
+        fi
+      fi
       ;;
     run)
       if [[ -z "$*" ]]
