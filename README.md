@@ -14,14 +14,18 @@ bash and tmux 🤷‍♂️
 
 ```zsh
 zinit light-mode wait lucid as"command" \
-  mv"tmux-slay.sh -> tmux-slay" sbin"tmux-slay" \
+  sbin"tmux-slay" \
   atload"alias tslay=tmux-slay" \
   for @pschmitt/tmux-slay
 ```
 
 ### Otherwise
 
-Just get `tmux-slay.sh` and put it in your PATH.
+Just get `tmux-slay` and put it in your PATH.
+
+## Completions
+
+Completions for ZSH are available in the `completions/` dir.
 
 ## Usage
 
