@@ -25,7 +25,7 @@ Just get `tmux-slay.sh` and put it in your PATH.
 
 ## Usage
 
-```zsh
+```bash
 # Run single command
 tmux-slay run COMMAND
 
@@ -81,4 +81,12 @@ To debug `tmux-slay` just set `TMUX_SLAY_DEBUG` to any value:
 
 ```bash
 TMUX_SLAY_DEBUG=1
+```
+
+## Examples
+
+### Run an auto-reconnecting reverse SSH tunnel to the current machine
+
+```bash
+tmux-slay run -l -c -u -n ssh-forward -- ssh -o ExitOnForwardFailure=yes -R 22222:localhost:22 user@myvps.example.com
 ```
