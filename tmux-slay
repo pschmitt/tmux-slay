@@ -97,14 +97,31 @@ list_commands() {
 
 tmux_show_log() {
   local follow
+  local logtail
   local win_id
 
-  case "$1" in
-    -f|--follow)
-      follow=1
-      shift
-      ;;
-  esac
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -f|--follow)
+        follow=1
+        shift
+        ;;
+      -t|--tail)
+        logtail="$2"
+        # Substract one cause tmux shows 2 lines if called with "-E -1"
+        logtail="$(( logtail - 1 ))"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
 
   win_id="$1"
 
@@ -122,7 +139,12 @@ tmux_show_log() {
     # Show logs
     if [[ -z "$follow" ]]
     then
-      tmux capture-pane -p -S "-${hist_size}" -t "$target"
+      if [[ -n "$logtail" ]]
+      then
+        tmux capture-pane -p -t "$target" -E "-${logtail}"
+      else
+        tmux capture-pane -p -S "-${hist_size}" -t "$target"
+      fi
     else
       local tmpfile
       tmpfile=$(mktemp --tmpdir --suffix=.log 'tmux-slay.XXXXXX')
@@ -140,6 +162,12 @@ tmux_show_log() {
       tmux pipe-pane -t "$target"
       tmux pipe-pane -t "$target" -O "cat >> \"$tmpfile\""
 
+      if [[ -n "$logtail" ]]
+      then
+        # Show last X lines of the log
+        tmux capture-pane -p -t "$target" -E "-${logtail}"
+      fi
+
       tail -f "$tmpfile"
     fi
   else
@@ -152,12 +180,26 @@ get_logs() {
   local -a extra_args
   local input_type=guess
 
-  case "$1" in
-    -f|--follow)
-      extra_args+=(-f)
-      shift
-      ;;
-  esac
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -f|--follow)
+        extra_args+=(-f)
+        shift
+        ;;
+      -t|--tail)
+        extra_args+=(-t "$2")
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
 
   case "$1" in
     --latest|-l)
@@ -836,6 +878,10 @@ then
             LOG_FOLLOW=1
             shift
             ;;
+          -t|--tail)
+            LOG_TAIL="$2"
+            shift 2
+            ;;
           -n|--name)
             NAME="$2"
             shift 2
@@ -894,6 +940,11 @@ then
       if [[ -n "$LOG_FOLLOW" ]]
       then
         extra_args+=(-f)
+      fi
+
+      if [[ -n "$LOG_TAIL" ]]
+      then
+        extra_args+=(-t "$LOG_TAIL")
       fi
 
       if [[ -n "$NAME" ]]

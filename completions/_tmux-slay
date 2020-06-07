@@ -48,13 +48,27 @@ _tmux-slay() {
         logs)
           local -a flags=(
             -f:"Follow log output"
+            -t:"Tail lines. Show only last X lines."
           )
-          if [[ $#words -eq 3 ]]
-          then
-            _alternative \
-              'opts:Logs flags:(($flags))' && \
-              ret=0
-          fi
+
+          # FIXME DRY
+          for w in "$words[@]"
+          do
+            for f in "$flags[@]"
+            do
+              if [[ "${f}" =~ "^${w}:" ]]
+              then
+                flag=("${(@s/:/)f}")
+                desc="$flag[2]"
+                flags=(${flags#*:$desc})
+                break
+              fi
+            done
+          done
+
+          _alternative \
+            'opts:Logs flags:(($flags))' && \
+            ret=0
           ;;
         check)
           local -a flags=(
