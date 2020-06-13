@@ -373,6 +373,7 @@ wrap_command() {
     echo -n "$wcmd "
     echo -n "# SLAY_CMD_ID='$(slugify_cmd_machine "$@")' "
     echo -n "# SLAY_DATE='$(date -Iseconds)' "
+    echo -n "# SLAY_EXIT_CMD='$EXIT_CMD' "
     echo -n "# SLAY_OG_CMD='${*}' "
     {
       echo -n "# SLAY_PARAMS='"
@@ -401,6 +402,20 @@ extract_slay_params() {
 
 extract_slay_date() {
   sed -nr "s/.*SLAY_DATE='([^']+)'.*/\1/p" <<< "$*"
+}
+
+extract_slay_exit_cmd() {
+  sed -nr "s/.*SLAY_EXIT_CMD='([^']+)' # SLAY_.*/\1/p" <<< "$*"
+}
+
+get_exit_cmd_of_win_id() {
+  local win_id="$1"
+  local res
+
+  res="$(tmux list-panes -t bg -F "#{window_id} #{pane_start_command}" | \
+         grep -E -- "^${win_id}")"
+
+  extract_slay_exit_cmd "$res"
 }
 
 get_slay_param() {
@@ -623,8 +638,10 @@ _tmux_kill_windows() {
 
 tmux_kill_window() {
   local -a win_ids
-  local win_name
+  local exit_cmd
   local input_type
+  local win_id
+  local win_name
 
   case "$1" in
     --all|-a)
@@ -685,6 +702,17 @@ tmux_kill_window() {
       ;;
   esac
 
+  for win_id in "${win_ids[@]}"
+  do
+    exit_cmd="$(get_exit_cmd_of_win_id "$win_id")"
+
+    if [[ -n "$exit_cmd" ]]
+    then
+      echo "Running exit command for window $win_id: '$exit_cmd'"
+      eval "$exit_cmd"
+    fi
+  done
+
   if [[ -z "${win_ids[*]}" ]]
   then
     return 1
@@ -739,6 +767,10 @@ then
             ;;
           --cd|--cwd)
             TMUX_SLAY_CWD="$2"
+            shift 2
+            ;;
+          --exit|--exit-command|--ex)
+            EXIT_CMD="$2"
             shift 2
             ;;
           -n|--name)
@@ -799,6 +831,7 @@ then
           echo -n "LOOP=$LOOP UNIQUE=$UNIQUE CHECK=$CHECK KILL=$KILL "
           echo "ACTION=$ACTION WAIT_PERIOD=$WAIT_PERIOD"
           echo "SLAY_ENV=${SLAY_ENV[*]}"
+          echo "EXIT_CMD=$EXIT_CMD"
           echo "CMD=$*"
         } >&2
       fi

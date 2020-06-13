@@ -115,6 +115,7 @@ _tmux-slay() {
             -append:"Append. Open new window next to the current"
 
             --cd:"Change directory prior to executing command"
+            --exit:"Set an exit command to be executed when the command exits"
 
             -e:"Set environment variable"
             --env:"Set environment variable"
@@ -187,7 +188,7 @@ _tmux-slay() {
                 'dirs:Directories:_path_files -/' && \
                 ret=0
               ;;
-            -e|--env|--name|-n|--wait|-w|--timeout|-t)
+            -e|--env|--exit|--name|-n|--wait|-w|--timeout|-t)
               _alternative \
                 'nocompl:None:()' && \
               ret=0
