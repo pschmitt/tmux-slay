@@ -631,8 +631,16 @@ _tmux_kill_windows() {
   do
     # _tmux_kill_window "$win_id"
     win_name="$(tmux_get_window_name_from_window_id "$win_id")"
+    exit_cmd="$(get_exit_cmd_of_win_id "$win_id")"
+
     echo "Killing window $win_name"
     tmux kill-window -t "${TMUX_SLAY_SESSION}:${win_id}"
+
+    if [[ -n "$exit_cmd" ]]
+    then
+      echo "Running exit command for window $win_id: '$exit_cmd'"
+      eval "$exit_cmd; true"
+    fi
   done
 }
 
@@ -701,17 +709,6 @@ tmux_kill_window() {
       mapfile -t win_ids < <(guess_window_id_from_input -n "$@")
       ;;
   esac
-
-  for win_id in "${win_ids[@]}"
-  do
-    exit_cmd="$(get_exit_cmd_of_win_id "$win_id")"
-
-    if [[ -n "$exit_cmd" ]]
-    then
-      echo "Running exit command for window $win_id: '$exit_cmd'"
-      eval "$exit_cmd"
-    fi
-  done
 
   if [[ -z "${win_ids[*]}" ]]
   then
