@@ -48,6 +48,10 @@ list_commands() {
         simple=1
         shift
         ;;
+      -n|--names-only)
+        names_only=1
+        shift
+        ;;
       *)
         break
         ;;
@@ -85,7 +89,10 @@ list_commands() {
       fcmd="$(filter_out_metadata "$cmd")"
       ogcmd="$(extract_slay_og_cmd "$cmd")"
 
-      if [[ -n "$simple" ]]
+      if [[ -n "$names_only" ]]
+      then
+        echo "${window_name}"
+      elif [[ -n "$simple" ]]
       then
         echo "$pane_id [${window_name}] $ogcmd"
       else

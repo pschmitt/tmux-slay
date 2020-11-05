@@ -37,6 +37,7 @@ _tmux-slay() {
           local -a flags=(
             -r:"Raw output"
             -s:"Simple output"
+            -n:"Display window names only"
           )
           if [[ $#words -eq 3 ]]
           then
