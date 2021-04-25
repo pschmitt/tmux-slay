@@ -58,7 +58,7 @@ tmux-slay killall
 tmux-slay select COMMAND
 ```
 
-# ⚙️ Configuration options
+# ⚙️ Configuration
 
 ## 👶 Session name
 

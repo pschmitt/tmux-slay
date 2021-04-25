@@ -9,8 +9,27 @@ check_session() {
     grep -qE -- "^${TMUX_SLAY_SESSION}\$"
 }
 
+tmux_set_option() {
+  local -a extra_args
+  local tmux_config=${XDG_CONFIG_HOME:-${HOME}/.config}/tmux/tmux.conf
+
+  # Apply XDG_CONFIG_HOME hack
+  if [[ -r "$tmux_config" ]]
+  then
+    extra_args=(-f "$tmux_config")
+  fi
+
+  extra_args+=(-t "$TMUX_SLAY_SESSION")
+
+  tmux "${extra_args[@]}" set-option "$@"
+}
+
 create_session() {
-  local args=(new-session -d -s "$TMUX_SLAY_SESSION" -n "$TMUX_SLAY_INIT_WINDOW_TITLE")
+  local extra_args=(
+    new-session -d
+    -s "$TMUX_SLAY_SESSION"
+    -n "$TMUX_SLAY_INIT_WINDOW_TITLE"
+  )
   export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-${HOME}/.config}"
   export XDG_DATA_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}"
   local tmux_config=${XDG_CONFIG_HOME}/tmux/tmux.conf
@@ -18,24 +37,31 @@ create_session() {
   # Apply XDG_CONFIG_HOME hack
   if [[ -r "$tmux_config" ]]
   then
-    args=(-f "$tmux_config" "${args[@]}")
+    extra_args=(-f "$tmux_config" "${extra_args[@]}")
   fi
 
   # Create session
-  tmux "${args[@]}"
+  tmux "${extra_args[@]}"
 
   # Disable destroy-unattached for this session
-  tmux -f "$tmux_config" set-option -t "$TMUX_SLAY_SESSION" \
-    destroy-unattached off
+  tmux_set_option destroy-unattached off
 }
 
 list_commands() {
   local cmd
+  local colorize
   local output
-  local pane_id
   local raw
   local simple
+  local window_id
   local window_name
+  local -A color=(
+    [cmd]='\e[34m'
+    [ogcmd]='\e[36m'
+    [window_id]='\e[32m'
+    [window_name]='\e[35m'
+    [reset]='\e[0m'
+  )
 
   while [[ -n "$*" ]]
   do
@@ -52,6 +78,10 @@ list_commands() {
         names_only=1
         shift
         ;;
+      -c|--color)
+        colorize=1
+        shift
+        ;;
       *)
         break
         ;;
@@ -59,7 +89,7 @@ list_commands() {
   done
 
   tmux list-panes -s -t "$TMUX_SLAY_SESSION" \
-      -F '#{pane_id} #{pane_start_command}' \
+      -F '#{window_id} #{pane_start_command}' \
       2>/dev/null | \
     while read -r output
   do
@@ -75,28 +105,35 @@ list_commands() {
       continue
     fi
 
-    read -r pane_id cmd <<< "$output"
-    window_name="$(tmux_get_window_name_from_pane_id "$pane_id")"
+    read -r window_id cmd <<< "$output"
+    window_name="$(tmux_get_window_name_from_window_id "$window_id")"
 
     if [[ -n "$raw" ]]
     then
-      echo "$pane_id $window_name $cmd"
+      echo "$window_id $window_name $cmd"
     else
-      local fcmd
       local ogcmd
 
-      read -r pane_id cmd <<< "$output"
-      fcmd="$(filter_out_metadata "$cmd")"
-      ogcmd="$(extract_slay_og_cmd "$cmd")"
+      read -r window_id cmd <<< "$output"
+      cmd="$(get_window_cmd "$window_id")"
+      ogcmd="$(get_window_og_cmd "$window_id")"
+
+      if [[ -n "$colorize" ]]
+      then
+        cmd="${color[cmd]}${cmd}${color[reset]}"
+        ogcmd="${color[ogcmd]}${ogcmd}${color[reset]}"
+        window_id="${color[window_id]}${window_id}${color[reset]}"
+        window_name="${color[window_name]}${window_name}${color[reset]}"
+      fi
 
       if [[ -n "$names_only" ]]
       then
-        echo "${window_name}"
+        echo -e "${window_name}"
       elif [[ -n "$simple" ]]
       then
-        echo "$pane_id [${window_name}] $ogcmd"
+        echo -e "$window_id [${window_name}] $ogcmd"
       else
-        echo "$pane_id [${window_name}] $ogcmd [$fcmd]"
+        echo -e "$window_id [${window_name}] $ogcmd [$cmd]"
       fi
     fi
   done
@@ -321,14 +358,14 @@ check_on_command() {
 }
 
 slugify_cmd_human() {
-  sed -r 's/[^a-zA-Z0-9]+/-/g' <<< "$@" | \
+  sed -r 's/[^a-zA-Z0-9]+/-/g' <<< "$*" | \
     sed -r 's/^-+\|-+$//g' | \
     tr '[:upper:]' '[:lower:]' | \
     cut -c 1-20
 }
 
 slugify_cmd_machine() {
-  md5sum <<< "$@" | awk '{ print $1 }'
+  md5sum <<< "$*" | awk '{ print $1 }'
 }
 
 wrap_command() {
@@ -336,14 +373,6 @@ wrap_command() {
   local wait_period="${WAIT_PERIOD:-1}"
   local tshell="${SLAY_SHELL:-zsh -ic}"
   local sudocmd="${SLAY_SUDO:-sudo --}"
-  local noid
-
-  case "$1" in
-    -n|--no-id)
-      noid=1
-      shift
-      ;;
-  esac
 
   if [[ -n "$TIMEOUT" ]]
   then
@@ -373,95 +402,81 @@ wrap_command() {
     echo "Wrapped command: $wcmd" >&2
   fi
 
-  # FIXME Reimplement the following and all the extractions functions w/ window 
-  # user options
-  # See "user opt" in tmux(1)
-  # https://github.com/tmux/tmux/issues/2681 🤦
-  # tmux set -w -t "${window_id}" @SLAY_CMD_ID "$(slugify_cmd_machine "$@")"
-  # Take a look at "neww -P" as well to retrieve the window ID after creating
-  # a new window
-  if [[ -n "$noid" ]]
-  then
-    echo "$wcmd"
-  else
-    echo -n "$wcmd "
-    echo -n "# SLAY_CMD_ID='$(slugify_cmd_machine "$@")' "
-    echo -n "# SLAY_DATE='$(date -Iseconds)' "
-    echo -n "# SLAY_EXIT_CMD='$EXIT_CMD' "
-    echo -n "# SLAY_OG_CMD='${*}' "
-    {
-      echo -n "# SLAY_PARAMS='"
-      echo -n "LOOP=\"${LOOP}\" "
-      echo -n "WAIT_PERIOD=\"${wait_period}\" "
-      echo -n "SUDO=\"${SUDO}\" "
-      echo -n "SUDO_CMD=\"${sudocmd}\" "
-      echo -n "SLAY_SHELL=\"${tshell}\" "
-      echo -n "TIMEOUT=\"${TIMEOUT}\""
-      printf "'\n"
-    }
-  fi
+  echo "$wcmd"
 }
 
-extract_slay_cmd_id() {
-  sed -nr "s/.*SLAY_CMD_ID='([a-z0-9]+)'.*/\1/p" <<< "$*"
-}
-
-extract_slay_og_cmd() {
-  sed -nr "s/.*SLAY_OG_CMD='(.+)' # SLAY_.*/\1/p" <<< "$*"
-}
-
-extract_slay_params() {
-  sed -nr "s/.*SLAY_PARAMS='([^']+)'.*/\1/p" <<< "$*"
-}
-
-extract_slay_date() {
-  sed -nr "s/.*SLAY_DATE='([^']+)'.*/\1/p" <<< "$*"
-}
-
-extract_slay_exit_cmd() {
-  sed -nr "s/.*SLAY_EXIT_CMD='([^']+)' # SLAY_.*/\1/p" <<< "$*"
-}
-
-get_exit_cmd_of_win_id() {
+setup_window_metadata() {
   local win_id="$1"
-  local res
+  local name="$2"
+  local og_cmd="$3"
+  local cmd="$4"
+  local exit_cmd="${EXIT_CMD}"
+  local sudo="${SUDO}"
+  local sudo_cmd="${SUDO_CMD}"
+  local sudocmd="${SLAY_SUDO:-sudo --}"
+  local timeout="${TIMEOUT}"
+  local tshell="${SLAY_SHELL:-zsh -ic}"
+  local wait_period="${WAIT_PERIOD:-1}"
 
-  res="$(tmux list-panes -t bg -F "#{window_id} #{pane_start_command}" | \
-         grep -E -- "^${win_id}")"
-
-  extract_slay_exit_cmd "$res"
+  set_window_metadata "$win_id" date "$(date -Iseconds)"
+  set_window_metadata "$win_id" cmd_id "$(slugify_cmd_machine "$cmd")"
+  set_window_metadata "$win_id" cmd_slug "$(slugify_cmd_human "$cmd")"
+  set_window_metadata "$win_id" cmd "$cmd"
+  set_window_metadata "$win_id" og_cmd "$cmd"
+  set_window_metadata "$win_id" exit_cmd "$exit_cmd"
+  set_window_metadata "$win_id" shell "$tshell"
+  set_window_metadata "$win_id" sudo "$sudo"
+  set_window_metadata "$win_id" sudo_cmd "$sudo_cmd"
+  set_window_metadata "$win_id" timeout "$timeout"
+  set_window_metadata "$win_id" wait_period "$wait_period"
 }
 
-get_slay_param() {
-  # Usage: get_slay_param WAIT_PERIOD "$(list_commands -r | head -1)"
-  # shellcheck disable=2034
-  {
-    local LOOP
-    local WAIT_PERIOD
-    local SUDO
-    local SUDO_CMD
-    local SLAY_SHELL
-  }
+set_window_metadata() {
+  local win_id="$1"
+  local key="$2"
+  local val="$3"
 
-  local requested_param="$1"
-  shift
-
-  eval "$(extract_slay_params "$@")"
-
-  eval "echo \$$requested_param"
+  tmux set -w -t "${win_id}" \
+    "@${key}" "$val"
 }
 
-filter_out_metadata() {
-  sed -rn 's/(.+) # SLAY_CMD_ID=.+$/\1/p' <<< "$*" | \
-    sed 's#\\##g'
-  # NOTE the sed 's#\\##g' is to unfuck the display of sudo commands
-  # Example: %204 test sudo -- \while true; do whoami; sleep 1; done\
+get_window_metadata() {
+  local win_id="$1"
+  local key="$2"
+
+  tmux show -wv -t "$win_id" "@${key}"
+}
+
+get_window_start_date() {
+  get_window_metadata "$1" date
+}
+
+get_window_cmd() {
+  get_window_metadata "$1" cmd
+}
+
+get_window_cmd_id() {
+  get_window_metadata "$1" cmd_id
+}
+
+get_window_cmd_slug() {
+  get_window_metadata "$1" cmd_slug
+}
+
+get_window_og_cmd() {
+  get_window_metadata "$1" og_cmd
+}
+
+get_window_exit_cmd() {
+  get_window_metadata "$1" exit_cmd
 }
 
 list_slay_cmd_ids() {
-  local output
-  output="$(list_commands -r)"
-  extract_slay_cmd_id "$output"
+  local win_id
+  list_commands -r | while read -r win_id _
+  do
+    get_window_cmd_id "$win_id"
+  done
 }
 
 tmux_exec() {
@@ -497,8 +512,11 @@ tmux_exec() {
     done
   fi
 
-  tmux new-window -t "$target_window" -n "$name" \
-    "${extra_args[@]}" -- "$@"
+  tmux new-window -P -F '#{window_id}' \
+    -t "$target_window" \
+    -n "$name" \
+    "${extra_args[@]}" \
+    -- "$@"
 }
 
 tmux_exec_wrap() {
@@ -543,9 +561,15 @@ tmux_exec_wrap() {
     cmd_suffix="; ${cmd_suffix};"
   fi
 
-  cmd="$(wrap_command "${@}${cmd_suffix}")"
+  local og_cmd="${*}${cmd_suffix}"
+  cmd="$(wrap_command "$og_cmd")"
 
-  tmux_exec "$name" "$cmd"
+  local win_id
+  win_id="$(tmux_exec "$name" "$cmd")"
+  local rc="$?"
+
+  setup_window_metadata "$win_id" "$name" "$og_cmd" "$cmd"
+  return "$rc"
 }
 
 tmux_window_exists() {
@@ -570,30 +594,31 @@ tmux_get_last_window_id() {
 
 get_latest_window() {
   local cmd
-  local current_pane_id
+  local latest_win_id
   local output
-  local pane_id
+  local win_id
   local start_date
   local tmp
   local ts=-1
 
-  while read -r output
+  while read -r win_id _ cmd
   do
-    read -r current_pane_id _ cmd <<< "$output"
-    start_date="$(extract_slay_date "$cmd")"
+    start_date="$(get_window_start_date "$win_id")"
     tmp="$(date -d "$start_date" +'%s')"
 
     if [[ "$tmp" -gt "$ts" ]]
     then
       ts="$tmp"
-      pane_id="$current_pane_id"
+      latest_win_id="$win_id"
     fi
   done < <(list_commands -r)
 
-  if [[ -n "$pane_id" ]]
+  if [[ -z "$latest_win_id" ]]
   then
-    tmux_get_window_id_from_pane_id "$pane_id"
+    return 1
   fi
+
+  echo "$latest_win_id"
 }
 
 tmux_get_window_info() {
@@ -636,21 +661,21 @@ tmux_get_window_name_from_pane_id() {
 }
 
 get_cmd_window_id() {
-  local current
   local og_cmd
-  local pane_id
+  local win_id
 
-  list_commands -r | while read -r current
+  list_commands -r | while read -r win_id _
   do
-    og_cmd="$(extract_slay_og_cmd "$current")"
+    og_cmd="$(get_window_og_cmd "$win_id")"
+
     if [[ -n "$TMUX_SLAY_DEBUG" ]]
     then
       echo "CMD=$* vs. OG_CMD=$og_cmd" >&2
     fi
+
     if [[ "$og_cmd" == "$*" ]]
     then
-      pane_id="$(awk '{ print $1 }' <<< "$current")"
-      tmux_get_window_id_from_pane_id "$pane_id"
+      echo "$win_id"
     fi
   done
 }
@@ -669,7 +694,7 @@ _tmux_kill_windows() {
   do
     # _tmux_kill_window "$win_id"
     win_name="$(tmux_get_window_name_from_window_id "$win_id")"
-    exit_cmd="$(get_exit_cmd_of_win_id "$win_id")"
+    exit_cmd="$(get_window_exit_cmd "$win_id")"
 
     echo "Killing window $win_name"
     tmux kill-window -t "${TMUX_SLAY_SESSION}:${win_id}"
@@ -985,7 +1010,7 @@ then
 
   case "$ACTION" in
     list)
-      list_commands "$@" | sort
+      list_commands --color "$@" | sort
       ;;
     select)
       select_window "$@"
@@ -1076,7 +1101,7 @@ then
           print \$0;
         }" <<< "$CMD_SUFFIX")"
       tmux_exec_wrap -n "$NAME" --after "$CMD_SUFFIX" "$@"
-      list_commands -s "$@"
+      list_commands -s --color "$@"
 
       if [[ -n "$SELECT" ]]
       then
