@@ -151,6 +151,8 @@ _tmux-slay() {
             -N:"Don't wrap command"
             -W:"Don't wrap command"
 
+            --notify:"Notify via notify-send after command ends"
+
             --quiet:"Quiet mode. Don't output the run info if already running"
             -q:"Quiet mode. Don't output the run info if already running"
 
