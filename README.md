@@ -1,16 +1,16 @@
-# tmux-slay
+# 🚬 tmux-slay
 
 This scripts allows running commands in the background, in a TMUX session.
 
 It can be a poor man's init-sytem.
 
-## Dependencies
+# 🚏 Dependencies
 
 bash, awk, sed and tmux 🤷‍♂️
 
-## Installation
+# 🔨 Installation
 
-### Using zinit
+## 🧊 Using zinit
 
 ```zsh
 zinit light-mode wait lucid as"null" \
@@ -19,15 +19,15 @@ zinit light-mode wait lucid as"null" \
   for @pschmitt/tmux-slay
 ```
 
-### Otherwise
+## 🦆 Otherwise
 
 Just get `tmux-slay` and put it in your PATH.
 
-## Completions
+# 🎼 Completions
 
 Completions for ZSH are available in the `completions/` dir.
 
-## Usage
+# 🎮 Usage
 
 ```bash
 # Run single command
@@ -58,9 +58,9 @@ tmux-slay killall
 tmux-slay select COMMAND
 ```
 
-## Configuration options
+# ⚙️ Configuration options
 
-### Session name
+## 👶 Session name
 
 By default `tmux-slay` will create a new TMUX session named `bg` (for
 backgroud) to run all the commands you instruct it to.
@@ -71,7 +71,7 @@ To change that you can set the env var `TMUX_SLAY_SESSION`:
 TMUX_SLAY_SESSION="MY_SESSION_NAME"
 ```
 
-### Init window
+## 🌅 Init window
 
 `tmux-slay` keeps its session alive by creating an empty init-window named
 `bg-init`.
@@ -82,7 +82,7 @@ To change it you need to set `TMUX_SLAY_INIT_WINDOW_TITLE`:
 TMUX_SLAY_INIT_WINDOW_TITLE="MY_INIT_WINDOW_TITLE"
 ```
 
-### Debug mode
+## 🐛 Debug mode
 
 To debug `tmux-slay` just set `TMUX_SLAY_DEBUG` to any value:
 
@@ -90,9 +90,9 @@ To debug `tmux-slay` just set `TMUX_SLAY_DEBUG` to any value:
 TMUX_SLAY_DEBUG=1
 ```
 
-## Examples
+# 🧪 Examples
 
-### Run an auto-reconnecting reverse SSH tunnel to the current machine
+## 💻 Run an auto-reconnecting reverse SSH tunnel to the current machine
 
 ```bash
 tmux-slay run -l -c -u -n ssh-forward -- \
