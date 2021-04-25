@@ -373,6 +373,13 @@ wrap_command() {
     echo "Wrapped command: $wcmd" >&2
   fi
 
+  # FIXME Reimplement the following and all the extractions functions w/ window 
+  # user options
+  # See "user opt" in tmux(1)
+  # https://github.com/tmux/tmux/issues/2681 🤦
+  # tmux set -w -t "${window_id}" @SLAY_CMD_ID "$(slugify_cmd_machine "$@")"
+  # Take a look at "neww -P" as well to retrieve the window ID after creating
+  # a new window
   if [[ -n "$noid" ]]
   then
     echo "$wcmd"
