@@ -527,8 +527,16 @@ tmux_exec_wrap() {
     name="$(slugify_cmd_human "$@")"
   fi
 
+  # Replace %win_cmd with $name in notify-send command
   cmd_suffix="$(sed -r "s/%win_cmd/${name}/" <<< "$cmd_suffix")"
-  cmd="$(wrap_command "$@; ${cmd_suffix};")"
+
+  # Add suffix command
+  if [[ -n "$cmd_suffix" ]]
+  then
+    cmd_suffix="; ${cmd_suffix};"
+  fi
+
+  cmd="$(wrap_command "${@}${cmd_suffix}")"
 
   tmux_exec "$name" "$cmd"
 }
@@ -760,6 +768,7 @@ then
       ;;
     run|start|r|s|up)
       ACTION=run
+      NOTIFY_TIMEOUT=5
       shift
       while [[ -n "$*" ]]
       do
@@ -790,8 +799,12 @@ then
             shift 2
             ;;
           --notify)
-            CMD_SUFFIX='notify-send -a "$0" -t 5000 \"%win_cmd exited\"'
+            CMD_SUFFIX='notify-send -a "tmux-slay" -t %timeout \"%win_cmd exited [RC=\$?]\"'
             shift
+            ;;
+          --notify-timeout)
+            NOTIFY_TIMEOUT="$2"
+            shift 2
             ;;
           --exit|--exit-command|--ex)
             EXIT_CMD="$2"
@@ -1049,6 +1062,12 @@ then
         tmux_kill_window --cmd "$@" || true
       fi
 
+      # Update notify-send settings and convert seconds to ms
+      CMD_SUFFIX="$(awk "
+        {
+          gsub(\"%timeout\", \"$NOTIFY_TIMEOUT\" * 1000, \$0);
+          print \$0;
+        }" <<< "$CMD_SUFFIX")"
       tmux_exec_wrap -n "$NAME" --after "$CMD_SUFFIX" "$@"
       list_commands -s "$@"
 
