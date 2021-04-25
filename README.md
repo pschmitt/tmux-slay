@@ -6,7 +6,7 @@ It can be a poor man's init-sytem.
 
 ## Dependencies
 
-bash and tmux 🤷‍♂️
+bash, awk, sed and tmux 🤷‍♂️
 
 ## Installation
 
