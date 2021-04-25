@@ -496,24 +496,40 @@ tmux_exec() {
 
 tmux_exec_wrap() {
   local cmd
+  local cmd_suffix
   local name
 
-  case "$1" in
-    -n|--name)
-      if [[ -n "$2" ]]
-      then
-        name="$2"
-      fi
-      shift 2
-      ;;
-  esac
+  while [[ -n "$*" ]]
+  do
+    case "$1" in
+      -n|--name)
+        if [[ -n "$2" ]]
+        then
+          name="$2"
+        fi
+        shift 2
+        ;;
+      -s|--suffix|--after)
+        if [[ -n "$2" ]]
+        then
+          cmd_suffix="$2"
+        fi
+        shift 2
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
 
   if [[ -z "$name" ]]
   then
     name="$(slugify_cmd_human "$@")"
   fi
 
-  cmd="$(wrap_command "$@")"
+  cmd_suffix="$(sed -r "s/%win_cmd/${name}/" <<< "$cmd_suffix")"
+  cmd="$(wrap_command "$@; ${cmd_suffix};")"
+
   tmux_exec "$name" "$cmd"
 }
 
@@ -773,6 +789,10 @@ then
             TMUX_SLAY_CWD="$2"
             shift 2
             ;;
+          --notify)
+            CMD_SUFFIX='notify-send -a "$0" -t 5000 \"%win_cmd exited\"'
+            shift
+            ;;
           --exit|--exit-command|--ex)
             EXIT_CMD="$2"
             shift 2
@@ -1029,7 +1049,7 @@ then
         tmux_kill_window --cmd "$@" || true
       fi
 
-      tmux_exec_wrap -n "$NAME" "$@"
+      tmux_exec_wrap -n "$NAME" --after "$CMD_SUFFIX" "$@"
       list_commands -s "$@"
 
       if [[ -n "$SELECT" ]]
