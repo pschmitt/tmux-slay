@@ -13,7 +13,7 @@ bash and tmux 🤷‍♂️
 ### Using zinit
 
 ```zsh
-zinit light-mode wait lucid as"command" \
+zinit light-mode wait lucid as"null" \
   sbin"tmux-slay" \
   atload"alias tslay=tmux-slay" \
   for @pschmitt/tmux-slay
