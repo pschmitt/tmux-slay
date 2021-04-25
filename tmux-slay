@@ -173,7 +173,7 @@ tmux_show_log() {
   then
     local target="${TMUX_SLAY_SESSION}:${win_id}"
     local hist_size
-    hist_size="$(tmux show-options -t bg -gqv history-limit)"
+    hist_size="$(tmux show-options -t "$TMUX_SLAY_SESSION" -gqv history-limit)"
     if [[ -z "$hist_size" ]]
     then
       # FIXME What's tmux's default?
