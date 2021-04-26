@@ -1025,7 +1025,7 @@ then
     list)
       extra_args=()
 
-      if [[ -z "$NO_COLOR" ]]
+      if [[ -z "$NO_COLOR" ]] && [[ -t 1 ]]
       then
         extra_args+=(--color)
       fi
