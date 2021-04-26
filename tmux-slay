@@ -422,7 +422,7 @@ setup_window_metadata() {
   set_window_metadata "$win_id" cmd_id "$(slugify_cmd_machine "$cmd")"
   set_window_metadata "$win_id" cmd_slug "$(slugify_cmd_human "$cmd")"
   set_window_metadata "$win_id" cmd "$cmd"
-  set_window_metadata "$win_id" og_cmd "$cmd"
+  set_window_metadata "$win_id" og_cmd "$og_cmd"
   set_window_metadata "$win_id" exit_cmd "$exit_cmd"
   set_window_metadata "$win_id" shell "$tshell"
   set_window_metadata "$win_id" sudo "$sudo"
@@ -850,7 +850,8 @@ then
             LOOP=1
             # Check if $2 is a positive integer
             # https://stackoverflow.com/a/808740/1872036
-            if [[ -n "$2" ]] && [[ "$2" -eq "$2" ]] 2>/dev/null && [[ "$2" -gt 0 ]]
+            if [[ -n "$2" ]] && [[ "$2" -eq "$2" ]] 2>/dev/null && \
+               [[ "$2" -gt 0 ]]
             then
               WAIT_PERIOD="$2"
               shift
