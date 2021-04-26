@@ -970,6 +970,18 @@ then
     list|ls)
       ACTION=list
       shift
+      while [[ -n "$*" ]]
+      do
+        case "$1" in
+          -C|--no-color)
+            NO_COLOR=1
+            shift
+            ;;
+          *)
+            break
+            ;;
+        esac
+      done
       ;;
     logs|lg)
       ACTION=logs
@@ -1011,7 +1023,14 @@ then
 
   case "$ACTION" in
     list)
-      list_commands --color "$@" | sort
+      extra_args=()
+
+      if [[ -z "$NO_COLOR" ]]
+      then
+        extra_args+=(--color)
+      fi
+
+      list_commands "${extra_args[@]}" "$@" | sort
       ;;
     select)
       select_window "$@"

@@ -219,7 +219,7 @@ _tslay_get_slayed_commands() {
   local line
   local win_id
 
-  tmux-slay list -s | while read -r line
+  tmux-slay list --no-color -s | while read -r line
   do
     read win_id cmd <<< "$line"
     slayed_commands+=(${win_id}\:"${cmd}")
