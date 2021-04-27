@@ -114,7 +114,6 @@ list_commands() {
     else
       local ogcmd
 
-      read -r window_id cmd <<< "$output"
       cmd="$(get_window_cmd "$window_id")"
       ogcmd="$(get_window_og_cmd "$window_id")"
 
@@ -128,7 +127,7 @@ list_commands() {
 
       if [[ -n "$names_only" ]]
       then
-        echo -e "${window_name}"
+        echo "${window_name}"
       elif [[ -n "$simple" ]]
       then
         echo -e "$window_id [${window_name}] $ogcmd"
@@ -191,7 +190,7 @@ tmux_show_log() {
       fi
     else
       local tmpfile
-      tmpfile=$(mktemp --tmpdir --suffix=.log 'tmux-slay.XXXXXX')
+      tmpfile="$(mktemp --tmpdir --suffix=.log 'tmux-slay.XXXXXX')"
 
       if [[ -n "$TMUX_SLAY_DEBUG" ]]
       then
@@ -410,6 +409,8 @@ setup_window_metadata() {
   local name="$2"
   local og_cmd="$3"
   local cmd="$4"
+  local cmd_prefix="$cmd_prefix"
+  local cmd_suffix="$cmd_suffix"
   local exit_cmd="${EXIT_CMD}"
   local sudo="${SUDO}"
   local sudo_cmd="${SUDO_CMD}"
@@ -418,12 +419,14 @@ setup_window_metadata() {
   local tshell="${SLAY_SHELL:-zsh -ic}"
   local wait_period="${WAIT_PERIOD:-1}"
 
-  set_window_metadata "$win_id" date "$(date -Iseconds)"
-  set_window_metadata "$win_id" cmd_id "$(slugify_cmd_machine "$cmd")"
-  set_window_metadata "$win_id" cmd_slug "$(slugify_cmd_human "$cmd")"
   set_window_metadata "$win_id" cmd "$cmd"
-  set_window_metadata "$win_id" og_cmd "$og_cmd"
+  set_window_metadata "$win_id" cmd_id "$(slugify_cmd_machine "$cmd")"
+  set_window_metadata "$win_id" cmd_prefix "$cmd_prefix"
+  set_window_metadata "$win_id" cmd_slug "$(slugify_cmd_human "$cmd")"
+  set_window_metadata "$win_id" cmd_suffix "$cmd_suffix"
+  set_window_metadata "$win_id" date "$(date -Iseconds)"
   set_window_metadata "$win_id" exit_cmd "$exit_cmd"
+  set_window_metadata "$win_id" og_cmd "$og_cmd"
   set_window_metadata "$win_id" shell "$tshell"
   set_window_metadata "$win_id" sudo "$sudo"
   set_window_metadata "$win_id" sudo_cmd "$sudo_cmd"
@@ -519,8 +522,15 @@ tmux_exec() {
     -- "$@"
 }
 
+format_cmd() {
+  local name="$1"
+  shift
+  sed -r "s/%win_cmd/${name}/" <<< "$*"
+}
+
 tmux_exec_wrap() {
   local cmd
+  local cmd_prefix
   local cmd_suffix
   local name
 
@@ -528,17 +538,15 @@ tmux_exec_wrap() {
   do
     case "$1" in
       -n|--name)
-        if [[ -n "$2" ]]
-        then
-          name="$2"
-        fi
+        name="$2"
+        shift 2
+        ;;
+      -p|--prefix|--before)
+        cmd_prefix="trap '$2' SIGEXIT SIGINT SIGTERM; "
         shift 2
         ;;
       -s|--suffix|--after)
-        if [[ -n "$2" ]]
-        then
-          cmd_suffix="$2"
-        fi
+        cmd_suffix="; $2;"
         shift 2
         ;;
       *)
@@ -552,17 +560,12 @@ tmux_exec_wrap() {
     name="$(slugify_cmd_human "$@")"
   fi
 
-  # Replace %win_cmd with $name in notify-send command
-  cmd_suffix="$(sed -r "s/%win_cmd/${name}/" <<< "$cmd_suffix")"
-
-  # Add suffix command
-  if [[ -n "$cmd_suffix" ]]
-  then
-    cmd_suffix="; ${cmd_suffix};"
-  fi
+  # Replace %win_cmd with $name in prefix/suffix commands
+  cmd_prefix="$(format_cmd "$name" "$cmd_prefix")"
+  cmd_suffix="$(format_cmd "$name" "$cmd_suffix")"
 
   local og_cmd="${*}"
-  cmd="$(wrap_command "${og_cmd}${cmd_suffix}")"
+  cmd="${cmd_prefix}$(wrap_command "${og_cmd}")${cmd_suffix}"
 
   local win_id
   win_id="$(tmux_exec "$name" "$cmd")"
@@ -831,7 +834,7 @@ then
             shift 2
             ;;
           --notify)
-            CMD_SUFFIX='notify-send -a "tmux-slay" -t %timeout \"%win_cmd exited [RC=\$?]\"'
+            CMD_PREFIX='notify-send -a "tmux-slay" -t "%timeout" "%win_cmd exited [RC=$?]"'
             shift
             ;;
           --notify-timeout)
@@ -1115,12 +1118,12 @@ then
       fi
 
       # Update notify-send settings and convert seconds to ms
-      CMD_SUFFIX="$(awk "
+      CMD_PREFIX="$(awk "
         {
           gsub(\"%timeout\", \"$NOTIFY_TIMEOUT\" * 1000, \$0);
           print \$0;
-        }" <<< "$CMD_SUFFIX")"
-      tmux_exec_wrap -n "$NAME" --after "$CMD_SUFFIX" "$@"
+        }" <<< "$CMD_PREFIX")"
+      tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" "$@"
       list_commands -s --color "$@"
 
       if [[ -n "$SELECT" ]]
@@ -1129,28 +1132,34 @@ then
       fi
       ;;
     kill)
+      extra_args=()
+
       if [[ -n "$NAME" ]]
       then
-        tmux_kill_window --name "$NAME"
-      else
-        if [[ -n "$*" ]]
-        then
-          tmux_kill_window "$@"
-        else
-          tmux_kill_window --latest
-        fi
-      fi
-      ;;
-    killall)
-      if [[ -n "$NAME" ]]
-      then
-        tmux_kill_window --name "$NAME"
+        extra_args+=(--name "$NAME")
       elif [[ -n "$*" ]]
       then
-        tmux_kill_window "$@"
+        extra_args+=("$@")
       else
-        tmux_kill_window --all
+        extra_args+=(--latest)
       fi
+
+      tmux_kill_window "${extra_args[@]}"
+      ;;
+    killall)
+      extra_args=()
+
+      if [[ -n "$NAME" ]]
+      then
+        extra_args+=(--name "$NAME")
+      elif [[ -n "$*" ]]
+      then
+        extra_args+=("$@")
+      else
+        extra_args+=(--all)
+      fi
+
+      tmux_kill_window "${extra_args[@]}"
       ;;
   esac
 fi
