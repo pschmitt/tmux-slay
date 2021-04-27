@@ -536,15 +536,24 @@ tmux_exec_wrap() {
   do
     case "$1" in
       -n|--name)
-        name="$2"
+        if [[ -n "$2" ]]
+        then
+          name="$2"
+        fi
         shift 2
         ;;
       -p|--prefix|--before)
-        cmd_prefix="trap '$2' SIGEXIT SIGINT SIGTERM; "
+        if [[ -n "$2" ]]
+        then
+          cmd_prefix="trap '$2' SIGEXIT SIGINT SIGTERM; "
+        fi
         shift 2
         ;;
       -s|--suffix|--after)
-        cmd_suffix="; $2;"
+        if [[ -n "$2" ]]
+        then
+          cmd_suffix="; $2;"
+        fi
         shift 2
         ;;
       *)
