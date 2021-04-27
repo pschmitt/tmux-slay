@@ -569,7 +569,10 @@ tmux_exec_wrap() {
   win_id="$(tmux_exec "$name" "$cmd")"
   local rc="$?"
 
-  setup_window_metadata "$win_id" "$name" "$og_cmd" "$cmd"
+  # Discard error messages here, since the command may complete before we get a
+  # chance to write all the metadata
+  # eg: tmux-slay run ls
+  setup_window_metadata "$win_id" "$name" "$og_cmd" "$cmd" 2>/dev/null
   return "$rc"
 }
 
