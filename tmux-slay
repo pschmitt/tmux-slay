@@ -19,9 +19,7 @@ tmux_set_option() {
     extra_args=(-f "$tmux_config")
   fi
 
-  extra_args+=(-t "$TMUX_SLAY_SESSION")
-
-  tmux "${extra_args[@]}" set-option "$@"
+  tmux "${extra_args[@]}" set-option -t "$TMUX_SLAY_SESSION" "$@"
 }
 
 create_session() {
