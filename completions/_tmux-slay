@@ -19,6 +19,7 @@ _tmux-slay() {
         help:"Help"
         kill:"Kill background command"
         killall:"Clear all"
+        ls:"List running commands"
         list:"List running commands"
         logs:"Display log of command"
         run:"Run command in background"
@@ -33,7 +34,7 @@ _tmux-slay() {
         help)
           _message "Display help message" && ret=0
           ;;
-        list)
+        list|ls)
           local -a flags=(
             -r:"Raw output"
             -s:"Simple output"
