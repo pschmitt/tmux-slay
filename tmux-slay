@@ -561,8 +561,8 @@ tmux_exec_wrap() {
     cmd_suffix="; ${cmd_suffix};"
   fi
 
-  local og_cmd="${*}${cmd_suffix}"
-  cmd="$(wrap_command "$og_cmd")"
+  local og_cmd="${*}"
+  cmd="$(wrap_command "${og_cmd}${cmd_suffix}")"
 
   local win_id
   win_id="$(tmux_exec "$name" "$cmd")"
