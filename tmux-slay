@@ -196,11 +196,11 @@ tmux_show_log() {
       fi
 
       # shellcheck disable=2064
-      trap "rm -f \"${tmpfile}\"; tmux pipe-pane -t \"${target}\"" \
+      trap "rm -f \"${tmpfile}\"; tmux pipe-pane -t \"${target}\" 2>/dev/null" \
         SIGINT SIGTERM EXIT
 
       # Run once without any command to clear previous pipes
-      tmux pipe-pane -t "$target"
+      tmux pipe-pane -t "$target" >/dev/null 2>&1
       tmux pipe-pane -t "$target" -O "cat >> \"$tmpfile\""
 
       if [[ -n "$logtail" ]]
@@ -209,7 +209,19 @@ tmux_show_log() {
         tmux capture-pane -p -t "$target" -E "-${logtail}"
       fi
 
-      tail -f "$tmpfile"
+      tail -f "$tmpfile" &
+
+      local tail_pid="$!"
+
+      (
+        while tmux_window_exists "$win_id"
+        do
+          sleep 0.5
+        done
+        kill "$tail_pid"
+      )&
+
+      wait "$tail_pid"
     fi
   else
     return 1
@@ -587,11 +599,12 @@ tmux_exec_wrap() {
   # chance to write all the metadata
   # eg: tmux-slay run ls
   setup_window_metadata "$win_id" "$name" "$og_cmd" "$cmd" 2>/dev/null
+  echo "$win_id"
   return "$rc"
 }
 
 tmux_window_exists() {
-  tmux list-windows -t "$TMUX_SLAY_SESSION" -F '#{window_name}' | \
+  tmux list-windows -t "$TMUX_SLAY_SESSION" -F '#{window_id}' | \
     grep -qE -- "^${1}\$"
 }
 
@@ -896,6 +909,10 @@ then
             BACKGROUND=1
             shift
             ;;
+          -F|--follow)
+            LOG_FOLLOW=1
+            shift
+            ;;
           -e|--env)
             SLAY_ENV+=("$2")
             shift 2
@@ -1138,12 +1155,22 @@ then
           gsub(\"%timeout\", \"$NOTIFY_TIMEOUT\" * 1000, \$0);
           print \$0;
         }" <<< "$CMD_PREFIX")"
-      tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" "$@"
-      list_commands -s --color "$@"
+      win_id=$(tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" "$@")
+
+      # Output matching commands
+      if [[ -z "$QUIET" ]]
+      then
+        list_commands -s --color "$@"
+      fi
 
       if [[ -n "$SELECT" ]]
       then
-        select_window "$@"
+        select_window "$win_id"
+      fi
+
+      if [[ -n "$LOG_FOLLOW" ]]
+      then
+        get_logs -f -t 9999 --window-id "$win_id"
       fi
       ;;
     kill)
