@@ -339,7 +339,7 @@ guess_window_id_from_input() {
   elif [[ "$1" =~ @.+ ]]
   then
     # Window ID provided
-    echo -- "$@"
+    echo "$*"
   else
     # Command provided
     get_cmd_window_id "$@"
