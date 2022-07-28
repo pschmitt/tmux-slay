@@ -388,7 +388,12 @@ wrap_command() {
     wcmd="timeout -k ${TIMEOUT}s -s 9 ${TIMEOUT}s $tshell '${wcmd}'"
   fi
 
-  if [[ -n "$LOOP" ]]
+  # loop until command succeeds once, then exit
+  if [[ -n "$UNTIL" ]]
+  then
+    wcmd="while ! ${wcmd}; do sleep ${wait_period}; done"
+  # infinite loop
+  elif [[ -n "$LOOP" ]]
   then
     wcmd="while true; do ${wcmd}; sleep ${wait_period}; done"
   fi
@@ -887,6 +892,10 @@ then
               WAIT_PERIOD="$2"
               shift
             fi
+            shift
+            ;;
+          --till|--until|--retry-till-success)
+            UNTIL=1
             shift
             ;;
           -w|--wait)
