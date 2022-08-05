@@ -874,7 +874,7 @@ then
             NOTIFY_TIMEOUT="$2"
             shift 2
             ;;
-          --exit|--exit-command|--ex)
+          --exit|--exit-command|--exit-cmd|--ex)
             EXIT_CMD="$2"
             shift 2
             ;;
