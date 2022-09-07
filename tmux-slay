@@ -379,9 +379,15 @@ slugify_cmd_machine() {
 
 wrap_command() {
   local wcmd="$*"
+  local delay="${DELAY}"
   local wait_period="${WAIT_PERIOD:-1}"
   local tshell="${SLAY_SHELL:-zsh -ic}"
   local sudocmd="${SLAY_SUDO:-sudo --}"
+
+  if [[ -n "$delay" ]]
+  then
+    wcmd="sleep ${delay}; ${wcmd}"
+  fi
 
   if [[ -n "$TIMEOUT" ]]
   then
@@ -866,6 +872,15 @@ then
             TMUX_SLAY_CWD="$2"
             shift 2
             ;;
+          --delay)
+            DELAY="$2"
+            if [[ -z "$DELAY" ]] || [[ "$DELAY" -lt 0 ]]
+            then
+              echo "Invalid DELAY: $0"
+              exit 2
+            fi
+            shift 2
+            ;;
           --notify)
             CMD_PREFIX='notify-send -a "tmux-slay" -t "%timeout" "%win_cmd exited [RC=$?]"'
             shift
@@ -1144,10 +1159,12 @@ then
         then
           list_commands -s "$@"
         fi
+
         if [[ -n "$SELECT" ]]
         then
           select_window "$@"
         fi
+
         exit 0
       fi
 
