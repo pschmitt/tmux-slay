@@ -619,6 +619,11 @@ tmux_window_exists() {
     grep -qE -- "^${1}\$"
 }
 
+tmux_window_name_exists() {
+  tmux list-windows -t "$TMUX_SLAY_SESSION" -F '#{window_name}' | \
+    grep -qE -- "^${1}\$"
+}
+
 tmux_get_all_windows() {
   # Filter out TMUX_SLAY_INIT_WINDOW_TITLE so that we do not kill the session
   tmux list-windows -t "$TMUX_SLAY_SESSION" \
@@ -1016,6 +1021,10 @@ then
             QUIET=1
             shift
             ;;
+          -n|--name)
+            NAME="$2"
+            shift 2
+            ;;
           --)
             shift
             break
@@ -1095,11 +1104,32 @@ then
       select_window "$@"
       ;;
     check)
-      if [[ -z "$*" ]]
+      if [[ -z "$*" ]] && [[ -z "$NAME" ]]
       then
         echo "Missing command." >&2
         exit 2
       fi
+
+      if [[ -n "$NAME" ]]
+      then
+        if tmux_window_name_exists "$NAME"
+        then
+          if [[ -z "$QUIET" ]]
+          then
+            echo "✅ Window '$NAME' exists."
+          fi
+          exit 0
+        else
+          if [[ -z "$QUIET" ]]
+          then
+            echo "❌ Window '$NAME' does not exist" >&2
+          fi
+          exit 1
+        fi
+
+        exit "$?"
+      fi
+
       if check_on_command "$@"
       then
         if [[ -z "$QUIET" ]]

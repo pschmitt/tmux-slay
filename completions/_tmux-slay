@@ -73,7 +73,9 @@ _tmux-slay() {
             ret=0
           ;;
         check)
+          # FIXME -n|--name accepts an argument!
           local -a flags=(
+            -n;"Window name"
             -q:"Quiet mode"
           )
           if [[ $#words -eq 3 ]]
