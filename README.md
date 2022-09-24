@@ -90,6 +90,14 @@ To debug `tmux-slay` just set `TMUX_SLAY_DEBUG` to any value:
 TMUX_SLAY_DEBUG=1
 ```
 
+To debug commands started with `tmux-slay` the best thing to do is to enable the
+`remain-on-exit` options for the session, so that you don't loose the logs of 
+your command:
+
+```bash
+tmux set-hook -t ${TMUX_SLAY_SESSION:-bg} window-linked 'set remain-on-exit on'
+```
+
 # 🧪 Examples
 
 ## 💻 Run an auto-reconnecting reverse SSH tunnel to the current machine
