@@ -473,7 +473,7 @@ get_window_metadata() {
   local win_id="$1"
   local key="$2"
 
-  tmux show -wv -t "$win_id" "@${key}"
+  tmux show -wv -t "$win_id" "@${key}" 2>/dev/null
 }
 
 get_window_start_date() {
