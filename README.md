@@ -95,7 +95,13 @@ To debug commands started with `tmux-slay` the best thing to do is to enable the
 your command:
 
 ```bash
-tmux set-hook -t ${TMUX_SLAY_SESSION:-bg} window-linked 'set remain-on-exit on'
+tmux-slay debug on
+```
+
+To disable this again, run:
+
+```bash
+tmux-slay debug off
 ```
 
 # 🧪 Examples

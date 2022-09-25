@@ -845,6 +845,32 @@ then
       usage
       exit 0
       ;;
+    attach|att|a)
+      ACTION=attach
+      shift
+      ;;
+    debug|dbg)
+      ACTION=debug
+      DEBUG_VAL="$2"
+
+      case "$DEBUG_VAL" in
+        on|true|1|enable)
+          DEBUG_VAL=on
+          ;;
+        off|false|0|disable)
+          DEBUG_VAL=off
+          ;;
+        *)
+          {
+            echo "Invalid DEBUG_VAL: $DEBUG_VAL"
+            echo "Allowed values: on|off"
+          } >&2
+          exit 2
+          ;;
+      esac
+
+      shift 2
+      ;;
     run|start|r|s|up)
       ACTION=run
       NOTIFY_TIMEOUT=5
@@ -881,7 +907,7 @@ then
             DELAY="$2"
             if [[ -z "$DELAY" ]] || [[ "$DELAY" -lt 0 ]]
             then
-              echo "Invalid DELAY: $0"
+              echo "Invalid DELAY: $0" >&2
               exit 2
             fi
             shift 2
@@ -1090,6 +1116,37 @@ then
   esac
 
   case "$ACTION" in
+    attach)
+      if ! check_session
+      then
+        create_session
+      fi
+
+      tmux attach -t "$TMUX_SLAY_SESSION"
+      exit "$?"
+      ;;
+    debug)
+      if ! check_session
+      then
+        create_session
+      fi
+
+      EXTRA_ARGS=()
+      MSG="debug mode"
+
+      if [[ "$DEBUG_VAL" == "on" ]]
+      then
+        MSG="Enabled $MSG"
+      else
+        MSG="Disabled $MSG"
+        EXTRA_ARGS=("-u")  # unset
+      fi
+
+      tmux set-hook "${EXTRA_ARGS[@]}" -t "${TMUX_SLAY_SESSION}" \
+        window-linked "set remain-on-exit on"
+      echo "$MSG" >&2
+      exit
+      ;;
     list)
       extra_args=()
 

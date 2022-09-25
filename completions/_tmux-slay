@@ -15,7 +15,9 @@ _tmux-slay() {
     command)
       local -a commands
       commands=(
+        attach:"Attach to tmux session"
         check:"Check if command is running"
+        debug:"Enable/disable command debugging"
         help:"Help"
         kill:"Kill background command"
         killall:"Clear all"
@@ -33,6 +35,18 @@ _tmux-slay() {
       case $words[2] in
         help)
           _message "Display help message" && ret=0
+          ;;
+        debug|dbg)
+          local -a flags=(
+            on:"Enable debug mode"
+            off:"Disable debug mode"
+          )
+          if [[ $#words -eq 3 ]]
+          then
+            _alternative \
+              'opts:List flags:(($flags))' && \
+              ret=0
+          fi
           ;;
         list|ls)
           local -a flags=(
