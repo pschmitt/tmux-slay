@@ -1,7 +1,65 @@
 #!/usr/bin/env bash
 
 usage() {
-  echo "Usage: $(basename "$0") run|kill|check|list [CMD]"
+  echo "Usage: tmux-slay [command] [flags] -- COMMAND"
+  echo
+  echo "Available commands:"
+  echo "  help, h, --help, -h             Show the help message with usage instructions"
+  echo "  attach, att, a                  Attach to an existing tmux session"
+  echo "  debug, dbg                      Enable or disable debug mode"
+  echo "  run, start, r, s, up            Run a command in a new tmux window"
+  echo "  kill, stop, k, down             Kill a specific tmux window"
+  echo "  clean, killall                  Kill all tmux windows"
+  echo "  check                           Check if a command is running in any tmux window"
+  echo "  list, ls                        List all running commands in tmux windows"
+  echo "  logs, lg                        Show logs for a specific tmux window"
+  echo "  select, show                    Select a specific tmux window"
+  echo
+  echo "  run [--] COMMAND"
+  echo "    -a, --append                  Append to the log file instead of overwriting it"
+  echo "    -u, --unique                  Ensure that the command is only running in one window"
+  echo "    -c, --check                   Check if the command is already running before starting it"
+  echo "    -k, --kill                    Kill the command if it is already running"
+  echo "    -n, --name                    Set window name instead of generating of from the command"
+  echo "    -N, -W, --nowrap, --no-wrap   Do not wrap the command in a shell"
+  echo "    --cd, --cwd DIRECTORY         Change to the specified directory before running the command"
+  echo "    --delay DELAY                 Delay before starting the command (in seconds)"
+  echo "    --notify                      Show a desktop notification when the command finishes"
+  echo "    --notify-timeout TIMEOUT      Set a timeout for the desktop notification"
+  echo "    --exit, --exit-cmd COMMAND    Run the specified command when the main command exits"
+  echo "    -l, --loop [PERIOD]           Restart the command after it exits, with a delay of PERIOD seconds (Default: 2)"
+  echo "    --till, --until               Keep restarting the command until it exits successfully"
+  echo "    -w, --wait PERIOD             Wait for the specified period of time before killing the command"
+  echo "    -s, --sudo                    Run the command with sudo ('sudo' can be overridden with TSLAY_SUDO)"
+  echo "    -t, --timeout TIMEOUT         Set a timeout for the command"
+  echo "    -f, --foreground, --select    Select the new window after starting the command"
+  echo "    -b, --background              Start the command in the background"
+  echo "    -F, --follow                  Follow the logs for the command"
+  echo "    -e, --env KEY=VAL             Set an environment variable for the command"
+  echo "    -q, --quiet                   Do not output any message"
+  echo
+  echo "  kill [--] COMMAND"
+  echo "    -n, --name                    Specify the name of the window to kill, instead of the command"
+  echo
+  echo "  clean COMMAND"
+  echo "    -n, --name                    Specify the name of the window to clean, instead of the command"
+  echo
+  echo "  check [--] COMMAND"
+  echo "    -q, --quiet                   Do not output any message"
+  echo "    -n, --name                    Specify the name of the window to check, instead of the command"
+  echo
+  echo "  list [--] [COMMAND]"
+  echo "    -C, --no-color                Do not use colors in the output"
+  echo
+  echo "  logs [--] [COMMAND]"
+  echo "    -f, --follow                  Follow the logs in real time"
+  echo "    -t, --tail LINES              Show the last LINES lines of logs"
+  echo "    -n, --name                    Specify the name of the window to show logs of, instead of the command"
+  echo "    --latest                      Show the logs of the last window"
+  echo
+  echo "  select [--] COMMAND"
+  echo "    -n, --name                    Specify the name of the window to select, instead of the command"
+  echo
 }
 
 check_session() {
