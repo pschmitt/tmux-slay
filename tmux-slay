@@ -26,7 +26,9 @@ usage() {
   echo "    --delay DELAY                 Delay before starting the command (in seconds)"
   echo "    --notify                      Show a desktop notification when the command finishes"
   echo "    --notify-timeout TIMEOUT      Set a timeout for the desktop notification"
-  echo "    --exit, --exit-cmd COMMAND    Run the specified command when the main command exits"
+  echo "    --exit, --exit-cmd COMMAND    Run the specified command when the main command exits (always runs, ignores the return code)"
+  echo "    --exit0 COMMAND               Run the specified command when the main command exits successfully"
+  echo "    --exitN COMMAND               Run the specified command when the main command exits with an error (rc != 0)"
   echo "    -l, --loop [PERIOD]           Restart the command after it exits, with a delay of PERIOD seconds (Default: 2)"
   echo "    --till, --until               Keep restarting the command until it exits successfully"
   echo "    -w, --wait PERIOD             Wait for the specified period of time before killing the command"
@@ -491,6 +493,8 @@ setup_window_metadata() {
   local cmd_prefix="$cmd_prefix"
   local cmd_suffix="$cmd_suffix"
   local exit_cmd="${EXIT_CMD}"
+  local exit_cmd_success="${EXIT_CMD_SUCCESS}"
+  local exit_cmd_failure="${EXIT_CMD_FAILURE}"
   local sudo="${SUDO}"
   local sudo_cmd="${SLAY_SUDO:-sudo --}"
   local timeout="${TIMEOUT}"
@@ -504,6 +508,8 @@ setup_window_metadata() {
   set_window_metadata "$win_id" cmd_suffix "$cmd_suffix"
   set_window_metadata "$win_id" date "$(date -Iseconds)"
   set_window_metadata "$win_id" exit_cmd "$exit_cmd"
+  set_window_metadata "$win_id" exit_cmd_success "$exit_cmd_success"
+  set_window_metadata "$win_id" exit_cmd_failure "$exit_cmd_failure"
   set_window_metadata "$win_id" name "$name"
   set_window_metadata "$win_id" og_cmd "$og_cmd"
   set_window_metadata "$win_id" shell "$tshell"
@@ -556,6 +562,14 @@ get_window_og_cmd() {
 
 get_window_exit_cmd() {
   get_window_metadata "$1" exit_cmd
+}
+
+get_window_exit_cmd_success() {
+  get_window_metadata "$1" exit_cmd_success
+}
+
+get_window_exit_cmd_failure() {
+  get_window_metadata "$1" exit_cmd_failure
 }
 
 list_slay_cmd_ids() {
@@ -638,7 +652,21 @@ tmux_exec_wrap() {
       -s|--suffix|--after)
         if [[ -n "$2" ]]
         then
-          cmd_suffix="; $2;"
+          cmd_suffix+="; $2;"
+        fi
+        shift 2
+        ;;
+      --exit0|--exit-success|-0)
+        if [[ -n "$2" ]]
+        then
+          cmd_suffix+="&& { $2; }"
+        fi
+        shift 2
+        ;;
+      --exitN|--exitN-command|--failure|-9)
+        if [[ -n "$2" ]]
+        then
+          cmd_suffix+="|| { $2; }"
         fi
         shift 2
         ;;
@@ -800,13 +828,15 @@ _tmux_kill_windows() {
     # _tmux_kill_window "$win_id"
     win_name="$(tmux_get_window_name_from_window_id "$win_id")"
     exit_cmd="$(get_window_exit_cmd "$win_id")"
+    exit_cmd_success="$(get_window_exit_cmd_success "$win_id")"
+    exit_cmd_failure="$(get_window_exit_cmd_failure "$win_id")"
 
     echo "Killing window $win_name"
     tmux kill-window -t "${TMUX_SLAY_SESSION}:${win_id}"
 
     if [[ -n "$exit_cmd" ]]
     then
-      echo "Running exit command for window $win_id: '$exit_cmd'"
+      echo "Running exit command for window $win_id: '$exit_cmd'" >&2
       eval "$exit_cmd; true"
     fi
   done
@@ -814,7 +844,6 @@ _tmux_kill_windows() {
 
 tmux_kill_window() {
   local -a win_ids
-  local exit_cmd
   local input_type
   local win_id
   local win_name
@@ -982,6 +1011,14 @@ then
             EXIT_CMD="$2"
             shift 2
             ;;
+          --exit0|--exit0-command|--success|-0)
+            EXIT_CMD_SUCCESS="$2"
+            shift 2
+            ;;
+          --exitN|--exitN-command|--failure|-9)
+            EXIT_CMD_FAILURE="$2"
+            shift 2
+            ;;
           -n|--name)
             NAME="$2"
             shift 2
@@ -1050,6 +1087,8 @@ then
           echo "ACTION=$ACTION WAIT_PERIOD=$WAIT_PERIOD"
           echo "SLAY_ENV=${SLAY_ENV[*]}"
           echo "EXIT_CMD=$EXIT_CMD"
+          echo "EXIT_CMD_SUCCESS=$EXIT_CMD_SUCCESS"
+          echo "EXIT_CMD_FAILURE=$EXIT_CMD_FAILURE"
           echo "CMD=$*"
         } >&2
       fi
@@ -1326,7 +1365,9 @@ then
           gsub(\"%timeout\", \"$NOTIFY_TIMEOUT\" * 1000, \$0);
           print \$0;
         }" <<< "$CMD_PREFIX")"
-      win_id=$(tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" "$@")
+      win_id="$(tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" \
+        --exit0 "$EXIT_CMD_SUCCESS" \
+        --exitN "$EXIT_CMD_FAILURE" "$@")"
 
       # Output matching commands
       if [[ -z "$QUIET" ]]
