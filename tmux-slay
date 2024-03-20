@@ -438,7 +438,7 @@ slugify_cmd_machine() {
 }
 
 wrap_command() {
-  local wcmd="$*"
+  local wcmd=("$@")
   local delay="${DELAY}"
   local wait_period="${WAIT_PERIOD:-1}"
   local tshell="${SLAY_SHELL:-zsh -ic}"
@@ -446,12 +446,12 @@ wrap_command() {
 
   if [[ -n "$delay" ]]
   then
-    wcmd="sleep ${delay}; ${wcmd}"
+    wcmd=(sleep "${delay};" "${wcmd[@]}")
   fi
 
   if [[ -n "$TIMEOUT" ]]
   then
-    wcmd="timeout -k ${TIMEOUT}s -s 9 ${TIMEOUT}s $tshell '${wcmd}'"
+    wcmd=(timeout -k "${TIMEOUT}s" -s 9 "${TIMEOUT}s" $tshell "${wcmd[@]}")
   fi
 
   # loop until command succeeds once, then exit
@@ -479,10 +479,10 @@ wrap_command() {
 
   if [[ -n "$TMUX_SLAY_DEBUG" ]]
   then
-    echo "Wrapped command: $wcmd" >&2
+    echo "Wrapped command: ${wcmd[*]}" >&2
   fi
 
-  echo "$wcmd"
+  echo "${wcmd[*]}"
 }
 
 setup_window_metadata() {
@@ -669,6 +669,10 @@ tmux_exec_wrap() {
           cmd_suffix+="|| { $2; }"
         fi
         shift 2
+        ;;
+      --)
+        shift
+        break
         ;;
       *)
         break
