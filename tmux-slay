@@ -1336,17 +1336,25 @@ then
         create_session
       fi
 
+      # if [[ ! -t 1 || "$1" == "-" ]]
+      if [[ "$1" == "-" ]]
+      then
+        read -r -a COMMAND
+      else
+        COMMAND=("$@")
+      fi
+
       # If CHECK is set then don't re-execute the command if it is already running
-      if [[ "$CHECK" == "1" ]] && check_on_command "$@"
+      if [[ "$CHECK" == "1" ]] && check_on_command "${COMMAND[@]}"
       then
         if [[ -z "$QUIET" ]]
         then
-          list_commands -s "$@"
+          list_commands -s "${COMMAND[@]}"
         fi
 
         if [[ -n "$SELECT" ]]
         then
-          select_window "$@"
+          select_window "${COMMAND[@]}"
         fi
 
         exit 0
@@ -1356,7 +1364,7 @@ then
       if [[ "$UNIQUE" == "1" ]]
       then
         # TODO Kill all except latest
-        tmux_kill_window --cmd "$@" || true
+        tmux_kill_window --cmd "${COMMAND[@]}" || true
       fi
 
       # Update notify-send settings and convert seconds to ms
@@ -1367,12 +1375,12 @@ then
         }" <<< "$CMD_PREFIX")"
       win_id="$(tmux_exec_wrap -n "$NAME" --prefix "$CMD_PREFIX" \
         --exit0 "$EXIT_CMD_SUCCESS" \
-        --exitN "$EXIT_CMD_FAILURE" "$@")"
+        --exitN "$EXIT_CMD_FAILURE" "${COMMAND[@]}")"
 
       # Output matching commands
       if [[ -z "$QUIET" ]]
       then
-        list_commands -s --color "$@"
+        list_commands -s --color "${COMMAND[@]}"
       fi
 
       if [[ -n "$SELECT" ]]
