@@ -451,38 +451,42 @@ wrap_command() {
 
   if [[ -n "$TIMEOUT" ]]
   then
-    wcmd=(timeout -k "${TIMEOUT}s" -s 9 "${TIMEOUT}s" $tshell "${wcmd[@]}")
+    # shellcheck disable=2206
+    local wwcmd=($tshell "${wcmd[@]}")
+    wcmd=("timeout --kill-after='${TIMEOUT}' --signal=9 '${TIMEOUT}' ${wwcmd[*]@Q}")
   fi
 
   # loop until command succeeds once, then exit
   if [[ -n "$UNTIL" ]]
   then
-    wcmd="while ! ${wcmd}; do sleep ${wait_period}; done"
+    # FIXME this is probably not working
+    wcmd=("while ! ${wcmd[*]}; do sleep ${wait_period}; done")
   # infinite loop
   elif [[ -n "$LOOP" ]]
   then
-    wcmd="while true; do ${wcmd}; sleep ${wait_period}; done"
+    # FIXME this is probably not working
+    wcmd=("while true; do ${wcmd[*]}; sleep ${wait_period}; done")
   fi
 
   if [[ -z "$NOWRAP" ]]
   then
-    wcmd="$tshell "\"${wcmd}\"""
+    # shellcheck disable=2206
+    wcmd=($tshell "${wcmd[@]}")
   fi
 
   if [[ -n "$SUDO" ]]
   then
-    # FIXME The "\\" leads to the command in list containing \ chars
-    # Example: %204 sudo -- \while true; do whoami; sleep 1; done\
-    # wcmd="sudo -- \\"${wcmd}\\""
-    wcmd="$sudocmd \\"${wcmd}\\""
+    # shellcheck disable=2206
+    wcmd=($sudocmd "${wcmd[@]}")
   fi
 
   if [[ -n "$TMUX_SLAY_DEBUG" ]]
   then
-    echo "Wrapped command: ${wcmd[*]}" >&2
+    echo "Wrapped command: ${wcmd[*]@Q}" >&2
+    echo "typeset: $(typeset -p wcmd)" >&2
   fi
 
-  echo "${wcmd[*]}"
+  echo "${wcmd[*]@Q}"
 }
 
 setup_window_metadata() {
