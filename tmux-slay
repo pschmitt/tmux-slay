@@ -52,6 +52,10 @@ usage() {
   echo
   echo "  list [--] [COMMAND]"
   echo "    -C, --no-color                Do not use colors in the output"
+  echo "    -n, --name                    Filter on window name instead of command"
+  echo "    -r, --raw                     Output raw data (window_id window_name command)"
+  echo "    -N,  --names-only             Output only the window names"
+  echo "    -s, --simple                  Output a simple format (window_id [window_name] command)"
   echo
   echo "  logs [--] [COMMAND]"
   echo "    -f, --follow                  Follow the logs in real time"
@@ -113,6 +117,8 @@ list_commands() {
   local simple
   local window_id
   local window_name
+  local window_name_filter
+
   local -A color=(
     [cmd]='\e[34m'
     [ogcmd]='\e[36m'
@@ -132,8 +138,12 @@ list_commands() {
         simple=1
         shift
         ;;
-      -n|--names-only)
+      -N|--names-only)
         names_only=1
+        shift
+        ;;
+      -n|--name)
+        window_name_filter=1
         shift
         ;;
       -c|--color)
@@ -146,13 +156,15 @@ list_commands() {
     esac
   done
 
+  local filter="$*"
+
   tmux list-panes -s -t "$TMUX_SLAY_SESSION" \
       -F '#{window_id} #{pane_start_command}' \
       2>/dev/null | \
     while read -r output
   do
     # Check if a command filter has been provided
-    if [[ -n "$*" ]] && ! grep -Eq -- "$*" <<< "$output"
+    if [[ -n "$filter" && -z $window_name_filter ]] && ! grep -Eq -- "$filter" <<< "$output"
     then
       continue
     fi
@@ -165,6 +177,12 @@ list_commands() {
 
     read -r window_id cmd <<< "$output"
     window_name="$(tmux_get_window_name_from_window_id "$window_id")"
+
+    # Check if a window filter has been provided
+    if [[ -n "$filter" && -n $window_name_filter ]] && ! grep -Eq -- "$filter" <<< "$window_name"
+    then
+      continue
+    fi
 
     if [[ -n "$raw" ]]
     then
@@ -1288,8 +1306,6 @@ then
           fi
           exit 1
         fi
-
-        exit "$?"
       fi
 
       if check_on_command "$@"
