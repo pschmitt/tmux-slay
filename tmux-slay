@@ -152,7 +152,7 @@ list_commands() {
     while read -r output
   do
     # Check if a command filter has been provided
-    if [[ -n "$*" ]] && ! grep -q -- "$*" <<< "$output"
+    if [[ -n "$*" ]] && ! grep -Eq -- "$*" <<< "$output"
     then
       continue
     fi
